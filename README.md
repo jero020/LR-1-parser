@@ -18,14 +18,13 @@ This project implements a rule-based system with:
 
 ## System Requirements
 
-- **Operating System**: macOS, Linux, or Windows
-- **Python Version**: 3.8 or higher
+- **Operating System**: macOS or Windows
+- **Python Version**: 3.9 or higher
 - **Dependencies**: None (standard library only)
 
 ### Tested Environments
 
 - macOS with Python 3.10+
-- Linux with Python 3.8+
 - Windows with Python 3.9+
 
 ## Project Structure

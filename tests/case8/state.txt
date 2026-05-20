@@ -1,2 +1,2 @@
-temp = 25
+temp = 50
 humidity = 50

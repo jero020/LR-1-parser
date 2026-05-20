@@ -61,8 +61,16 @@ def main(argv: list[str] | None = None) -> int:
         print("Usage: python main.py <rules_file> [state_file]", file=sys.stderr)
         return 1
 
-    rules_text = Path(args[0]).read_text(encoding="utf-8")
-    state_text = Path(args[1]).read_text(encoding="utf-8") if len(args) == 2 else ""
+    rules_path = Path(args[0])
+    rules_text = rules_path.read_text(encoding="utf-8")
+    
+    # If state_file is explicitly provided, use it
+    if len(args) == 2:
+        state_text = Path(args[1]).read_text(encoding="utf-8")
+    else:
+        # Auto-detect state.txt in the same directory as rules.txt
+        state_path = rules_path.parent / "state.txt"
+        state_text = state_path.read_text(encoding="utf-8") if state_path.exists() else ""
 
     program = parse_program(rules_text)
     variables, facts = parse_state(state_text)
