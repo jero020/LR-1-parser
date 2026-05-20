@@ -5,4 +5,4 @@ rule r2:
 if alert then fan_on
 
 rule r3:
-if humidity > 20 then cooling
+if humidity < 20 then cooling
