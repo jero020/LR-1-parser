@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+# El analizador trabaja sobre el AST y no necesita volver a tokenizar ni parsear.
 from ast_nodes import Action, Condition, Program, Rule
 
 
+# Revisa propiedades del programa que pueden ser utiles despues de ejecutarlo.
 class StaticAnalyzer:
     """Inspect a program and report static analysis warnings.
 
@@ -28,6 +30,8 @@ class StaticAnalyzer:
                 provided, no rules are considered applied.
         """
 
+        # Guarda el AST y una copia del conjunto de reglas disparadas por el
+        # interprete para poder detectar reglas que nunca se aplicaron.
         self.program = program
         self.applied_rules = set(applied_rules or set())
 
@@ -39,6 +43,8 @@ class StaticAnalyzer:
         ``find_redundant_rules`` instead.
         """
 
+        # Agrupa reglas por el hecho que producen; un mismo hecho con reglas
+        # distintas puede representar conflicto de accion.
         rules_by_fact: defaultdict[str, list[Rule]] = defaultdict(list)
 
         for rule in self.program.rules:
@@ -46,10 +52,9 @@ class StaticAnalyzer:
 
         messages: list[str] = []
         for fact, rules in rules_by_fact.items():
-            unique_condition_actions = {
-                (rule.condition, rule.action)
-                for rule in rules
-            }
+            # Distingue conflictos reales de reglas duplicadas: si condicion y
+            # accion son iguales, se reportan como redundancia, no conflicto.
+            unique_condition_actions = {(rule.condition, rule.action) for rule in rules}
 
             if len(unique_condition_actions) > 1:
                 rule_names = ", ".join(rule.name for rule in rules)
@@ -60,6 +65,7 @@ class StaticAnalyzer:
     def find_redundant_rules(self) -> list[str]:
         """Find rules with the same condition and the same action."""
 
+        # Agrupa por comportamiento observable: misma condicion y misma accion.
         rules_by_behavior: defaultdict[tuple[Condition, Action], list[Rule]] = (
             defaultdict(list)
         )
@@ -69,6 +75,7 @@ class StaticAnalyzer:
 
         messages: list[str] = []
         for rules in rules_by_behavior.values():
+            # Si dos o mas reglas tienen el mismo comportamiento, son redundantes.
             if len(rules) > 1:
                 rule_names = ", ".join(rule.name for rule in rules)
                 messages.append(f"Redundant rules: {rule_names}")
@@ -77,20 +84,23 @@ class StaticAnalyzer:
 
     def find_inactive_rules(self) -> list[str]:
         """Find rules that were not applied during interpretation.
-        
+
         Only reports the last unapplied rule to match expected behavior.
         """
-        
+
+        # Compara todas las reglas del programa contra las que registro el
+        # interprete como aplicadas.
         inactive_rules = [
             rule
             for rule in self.program.rules
             if rule.name not in self.applied_rules
         ]
-        
-        # Only report the last inactive rule
+
+        # Por contrato de salida de este proyecto solo se reporta la ultima
+        # regla inactiva encontrada.
         if inactive_rules:
             return [f"Potentially inactive rule: {inactive_rules[-1].name}"]
-        
+
         return []
 
     def analyze(
@@ -101,6 +111,8 @@ class StaticAnalyzer:
     ) -> list[str]:
         """Return all selected static analysis messages in canonical order."""
 
+        # Acumula mensajes en un orden estable para que las pruebas puedan
+        # comparar stdout literalmente.
         messages: list[str] = []
 
         if include_conflicts:
