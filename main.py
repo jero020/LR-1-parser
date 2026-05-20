@@ -13,11 +13,12 @@ from static_analysis import StaticAnalyzer
 
 
 def parse_state(text: str) -> tuple[dict[str, int], set[str]]:
-    """Parse initial variables and active facts from state text.
+    """Lee el archivo de estado inicial y lo divide en dos grupos.
 
-    Blank lines are ignored. Lines containing ``=`` are treated as integer
-    variable assignments, and all other non-empty lines are treated as active
-    facts.
+    Las lineas como ``temp = 35`` se guardan como variables numericas porque
+    sirven para comparaciones. Las lineas como ``alert`` se guardan como hechos
+    activos porque representan cosas que ya son verdaderas antes de ejecutar
+    las reglas.
     """
 
     variables: dict[str, int] = {}
@@ -44,11 +45,11 @@ def parse_state(text: str) -> tuple[dict[str, int], set[str]]:
 
 
 def print_execution_output(derived_facts: set[str], has_analysis: bool = False) -> None:
-    """Print derived facts in the canonical output format.
-    
-    Args:
-        derived_facts: Facts derived during execution.
-        has_analysis: Whether there will be analysis output following this.
+    """Imprime el resultado principal del programa.
+
+    Muestra los hechos nuevos que se derivaron durante la ejecucion. Si no hay
+    hechos nuevos, imprime ``(no output)`` solamente cuando tampoco hay mensajes
+    de analisis que mostrar.
     """
 
     # Si no hay hechos derivados, solo se imprime el marcador especial cuando
@@ -65,7 +66,12 @@ def print_execution_output(derived_facts: set[str], has_analysis: bool = False) 
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the parser, interpreter, and static analyzer from CLI arguments."""
+    """Coordina todo el programa desde la linea de comandos.
+
+    Lee los archivos de entrada, convierte las reglas en AST, ejecuta el
+    interprete, corre el analisis estatico y finalmente imprime la salida en el
+    orden esperado.
+    """
 
     # Toma argumentos reales de consola, salvo que una prueba pase una lista
     # explicita para ejecutar main de forma controlada.

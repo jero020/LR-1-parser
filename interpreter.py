@@ -16,11 +16,10 @@ from ast_nodes import (
 
 # Ejecuta las reglas repetidamente hasta que no pueda derivar hechos nuevos.
 class Interpreter:
-    """Execute a rule-based monitoring program until it reaches a fixed point.
+    """Ejecuta un programa de reglas hasta que ya no cambie el estado.
 
-    The interpreter keeps variables and active facts separate. Variables store
-    numeric measurements such as CPU or memory usage, while facts store derived
-    monitoring states such as high_cpu or notify_user.
+    Mantiene variables numericas y hechos activos por separado. Las variables se
+    usan en comparaciones y los hechos indican que algo ya fue activado.
     """
 
     def __init__(
@@ -29,12 +28,10 @@ class Interpreter:
         variables: dict[str, int],
         facts: set[str],
     ) -> None:
-        """Create an interpreter for a program and initial state.
+        """Crea un interprete con el programa y el estado inicial.
 
-        Args:
-            program: The AST program to execute.
-            variables: Initial numeric values available to comparisons.
-            facts: Facts that are already active before rule execution.
+        Copia las variables y hechos recibidos para poder trabajar sin modificar
+        directamente los datos originales que llegaron desde ``main.py``.
         """
 
         # Guarda el programa y copia el estado inicial para evitar modificar
@@ -47,7 +44,11 @@ class Interpreter:
         self.applied_rules: set[str] = set()
 
     def evaluate_condition(self, condition: Condition) -> bool:
-        """Evaluate a condition against the current interpreter state."""
+        """Decide si una condicion es verdadera con el estado actual.
+
+        Dependiendo del tipo de nodo, evalua una comparacion, revisa si un hecho
+        esta activo o combina dos condiciones con ``AND``.
+        """
 
         # Comparaciones numericas se delegan a un metodo especializado.
         if isinstance(condition, ComparisonCondition):
@@ -67,11 +68,11 @@ class Interpreter:
         raise TypeError(f"Unknown condition type: {type(condition).__name__}")
 
     def run(self) -> set[str]:
-        """Execute rules until no new facts are derived.
+        """Ejecuta todas las reglas hasta llegar a un punto fijo.
 
-        Returns:
-            The set of facts produced by rules, excluding facts that were active
-            in the initial state.
+        Un punto fijo significa que se hizo una vuelta completa y ninguna regla
+        produjo un hecho nuevo. Devuelve solo los hechos que nacieron durante la
+        ejecucion, no los que ya existian al inicio.
         """
 
         # Bucle de punto fijo: cada vuelta evalua todas las reglas con el
@@ -98,7 +99,11 @@ class Interpreter:
         return self.active_facts - self.initial_facts
 
     def _evaluate_comparison(self, condition: ComparisonCondition) -> bool:
-        """Evaluate a numeric comparison condition."""
+        """Evalua una condicion numerica como ``temp > 30``.
+
+        Busca el valor de la variable en el estado y aplica el operador guardado
+        en el AST.
+        """
 
         # Si la variable no existe en el estado, la comparacion no se cumple.
         if condition.identifier not in self.variables:

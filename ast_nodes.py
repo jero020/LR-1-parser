@@ -8,10 +8,9 @@ from dataclasses import dataclass
 # Nodo raiz del AST: agrupa todas las reglas parseadas desde el archivo.
 @dataclass(frozen=True)
 class Program:
-    """A complete program made of monitoring rules.
+    """Representa el programa completo ya parseado.
 
-    Each rule describes a condition to check and the fact to assert when that
-    condition is satisfied.
+    Dentro guarda todas las reglas que el interprete va a evaluar.
     """
 
     # Lista ordenada de reglas tal como aparecen en el programa fuente.
@@ -21,17 +20,10 @@ class Program:
 # Nodo que representa una regla completa con nombre, condicion y accion.
 @dataclass(frozen=True)
 class Rule:
-    """A named monitoring rule with a condition and an action.
+    """Representa una regla del lenguaje.
 
-    Example:
-        rule r1:
-        if cpu_usage > 85 then high_cpu
-
-        Rule(
-            name="r1",
-            condition=ComparisonCondition("cpu_usage", ">", 85),
-            action=Action("high_cpu"),
-        )
+    Una regla tiene nombre, una condicion que se evalua y una accion que se
+    ejecuta cuando esa condicion es verdadera.
     """
 
     # Identificador usado para reportes de ejecucion y analisis.
@@ -45,7 +37,7 @@ class Rule:
 # Nodo simple para la consecuencia de una regla: activar un hecho.
 @dataclass(frozen=True)
 class Action:
-    """The fact produced when a rule condition is satisfied."""
+    """Representa el hecho que se activa cuando una regla se cumple."""
 
     # Nombre del hecho que se agrega al conjunto de hechos activos.
     fact: str
@@ -55,15 +47,15 @@ class Action:
 # clase concreta de condicion.
 @dataclass(frozen=True)
 class Condition:
-    """Base class for all rule conditions."""
+    """Clase base para cualquier tipo de condicion del lenguaje."""
 
 
 # Condicion de comparacion numerica: consulta una variable del estado inicial.
 @dataclass(frozen=True)
 class ComparisonCondition(Condition):
-    """A numeric comparison against a monitored value.
+    """Representa una comparacion numerica.
 
-    Example: cpu_usage > 85
+    Por ejemplo: ``temp > 30`` o ``humidity < 50``.
     """
 
     # Variable a buscar en el diccionario de variables del interprete.
@@ -77,9 +69,10 @@ class ComparisonCondition(Condition):
 # Condicion booleana basada en hechos: pregunta si un hecho ya esta activo.
 @dataclass(frozen=True)
 class FactCondition(Condition):
-    """A condition that checks whether a named fact is currently known.
+    """Representa una pregunta sobre un hecho activo.
 
-    Example: high_cpu
+    Por ejemplo: ``alert`` significa "la condicion es verdadera si alert ya
+    esta en el conjunto de hechos activos".
     """
 
     # Nombre del hecho que debe estar en active_facts.
@@ -89,20 +82,10 @@ class FactCondition(Condition):
 # Condicion compuesta: ambas ramas deben ser verdaderas para cumplir la regla.
 @dataclass(frozen=True)
 class AndCondition(Condition):
-    """A condition that requires both child conditions to be true.
+    """Representa dos condiciones unidas por ``AND``.
 
-    Example:
-        rule r2:
-        if high_cpu AND high_memory then system_overload
-
-        Rule(
-            name="r2",
-            condition=AndCondition(
-                FactCondition("high_cpu"),
-                FactCondition("high_memory"),
-            ),
-            action=Action("system_overload"),
-        )
+    Solo es verdadera cuando la condicion izquierda y la condicion derecha son
+    verdaderas al mismo tiempo.
     """
 
     # Rama izquierda de la conjuncion.

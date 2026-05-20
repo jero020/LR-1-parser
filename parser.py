@@ -1,19 +1,21 @@
 """LR(1)-compatible parser for the rule-based language.
 
 This parser implements the grammar:
-    Program → RuleList
-    RuleList → Rule RuleList | ε
-    Rule → rule id : if Cond then Action
-    Cond → Cond AND Cond | Atom
-    Atom → id RelOp value | id
-    RelOp → > | < | =
-    Action → id
+    Program -> RuleList
+    RuleList -> Rule RuleList | epsilon
+    Rule -> rule id : if Cond then Action
+    Cond -> Cond AND Cond | Atom
+    Atom -> id RelOp value | id
+    RelOp -> > | < | =
+    Action -> id
 
 The implementation uses recursive descent, which is compatible with LR(1).
 """
 
 from __future__ import annotations
 
+# Importa las clases del AST que el parser va construyendo conforme reconoce
+# reglas, condiciones y acciones.
 from ast_nodes import (
     Action,
     AndCondition,
@@ -26,26 +28,32 @@ from ast_nodes import (
 from lexer import Token, TokenType, tokenize
 
 
+# Error propio del parser: separa fallos sintacticos de fallos lexicos.
 class ParseError(Exception):
-    """Raised when a parsing error occurs."""
+    """Error que aparece cuando los tokens no siguen la gramatica esperada."""
 
     pass
 
 
+# El parser consume la lista de tokens de izquierda a derecha y produce un AST.
 class Parser:
-    """Recursive descent parser for the rule-based language."""
+    """Convierte una lista de tokens en un arbol de sintaxis abstracta."""
 
     def __init__(self, tokens: list[Token]) -> None:
-        """Initialize parser with a list of tokens.
+        """Prepara el parser para leer tokens desde el primero hasta EOF.
 
-        Args:
-            tokens: List of tokens from the lexer.
+        La posicion ``pos`` marca cual token se esta revisando en este momento.
         """
+        # pos apunta al token actual dentro del flujo; no se copian tokens.
         self.tokens = tokens
         self.pos = 0
 
     def error(self, message: str) -> None:
-        """Raise a parse error with context information."""
+        """Lanza un error sintactico indicando donde se rompio la gramatica.
+
+        Se usa cuando el parser esperaba un tipo de token y encontro otro.
+        """
+        # Usa el token actual para ubicar el error y mostrar que se esperaba.
         token = self.current_token()
         raise ParseError(
             f"Parse error at line {token.line}, column {token.column}: {message}. "
@@ -53,44 +61,70 @@ class Parser:
         )
 
     def current_token(self) -> Token:
-        """Get the current token without consuming it."""
+        """Devuelve el token actual sin mover la posicion del parser."""
+        # Devuelve EOF si se intenta leer mas alla, evitando errores de indice.
         if self.pos < len(self.tokens):
             return self.tokens[self.pos]
-        return self.tokens[-1]  # Return EOF token
+        return self.tokens[-1]
 
     def peek(self, offset: int = 0) -> Token:
-        """Look ahead at a token without consuming it."""
+        """Mira un token futuro sin consumir ningun token.
+
+        Es util cuando el parser necesita decidir que camino tomar segun lo que
+        viene despues.
+        """
+        # Permite mirar tokens futuros para tomar decisiones sintacticas.
         pos = self.pos + offset
         if pos < len(self.tokens):
             return self.tokens[pos]
-        return self.tokens[-1]  # Return EOF token
+        return self.tokens[-1]
 
     def advance(self) -> Token:
-        """Consume and return the current token."""
+        """Consume el token actual y avanza al siguiente.
+
+        Si ya esta en EOF, se queda ahi porque EOF funciona como marcador final.
+        """
+        # Consume el token actual, salvo EOF, que se mantiene como centinela.
         token = self.current_token()
         if token.type != TokenType.EOF:
             self.pos += 1
         return token
 
     def expect(self, token_type: TokenType) -> Token:
-        """Consume a token of the expected type or raise an error."""
+        """Exige que el token actual sea de cierto tipo.
+
+        Si coincide, lo consume y lo devuelve. Si no coincide, detiene el parseo
+        con un error claro.
+        """
+        # Verifica que la gramatica pida exactamente el token actual.
         token = self.current_token()
         if token.type != token_type:
             self.error(f"Expected {token_type.name}, got {token.type.name}")
         return self.advance()
 
     def match(self, *token_types: TokenType) -> bool:
-        """Check if current token matches any of the given types."""
+        """Pregunta si el token actual coincide con alguno de los tipos dados."""
+        # Consulta rapida para producciones opcionales o alternativas.
         return self.current_token().type in token_types
 
     def parse(self) -> Program:
-        """Parse the entire program."""
+        """Parsea el programa completo.
+
+        Primero lee todas las reglas y luego verifica que no haya tokens
+        sobrantes despues del final esperado.
+        """
+        # La raiz de la gramatica es una lista de reglas seguida por EOF.
         rules = self.parse_rule_list()
         self.expect(TokenType.EOF)
         return Program(rules=rules)
 
     def parse_rule_list(self) -> list[Rule]:
-        """Parse RuleList → Rule RuleList | ε"""
+        """Lee todas las reglas que aparezcan una despues de otra.
+
+        Se detiene cuando el siguiente token ya no es ``rule``. Si no hay
+        ninguna regla, devuelve una lista vacia.
+        """
+        # Lee reglas consecutivas hasta que ya no aparezca la palabra "rule".
         rules: list[Rule] = []
 
         while self.match(TokenType.RULE):
@@ -99,97 +133,107 @@ class Parser:
         return rules
 
     def parse_rule(self) -> Rule:
-        """Parse Rule → rule id : if Cond then Action"""
+        """Lee una regla completa y la convierte en un nodo ``Rule``.
+
+        La forma esperada es: ``rule nombre: if condicion then accion``.
+        """
+        # Estructura obligatoria de cada regla: rule <id>: if <cond> then <id>.
         self.expect(TokenType.RULE)
 
-        # Parse rule name (id)
+        # Nombre de la regla, usado despues por reportes y analisis estatico.
         name_token = self.expect(TokenType.ID)
         rule_name = name_token.lexeme
 
-        # Parse colon
+        # Dos puntos que separan encabezado y cuerpo de la regla.
         self.expect(TokenType.COLON)
 
-        # Parse 'if'
+        # Palabra clave que inicia la condicion.
         self.expect(TokenType.IF)
 
-        # Parse condition
+        # Subarbol que representa comparaciones, hechos o conjunciones AND.
         condition = self.parse_condition()
 
-        # Parse 'then'
+        # Palabra clave que separa condicion y accion.
         self.expect(TokenType.THEN)
 
-        # Parse action
+        # Accion final: el hecho que se activara si la condicion es verdadera.
         action = self.parse_action()
 
         return Rule(name=rule_name, condition=condition, action=action)
 
     def parse_condition(self) -> Condition:
-        """Parse Cond → Cond AND Cond | Atom
+        """Lee una condicion completa.
 
-        This implements left-recursion elimination using iteration to handle
-        left-associative AND operators.
+        Puede ser una condicion simple o varias condiciones unidas por ``AND``.
+        Cuando hay varios ``AND``, arma un arbol de condiciones encadenadas.
         """
+        # Primero lee un atomo; luego encadena todos los AND encontrados para
+        # formar un arbol binario de condiciones.
         left = self.parse_atom()
 
         while self.match(TokenType.AND):
-            self.advance()  # consume AND
+            self.advance()
             right = self.parse_atom()
             left = AndCondition(left, right)
 
         return left
 
     def parse_atom(self) -> Condition:
-        """Parse Atom → id RelOp value | id"""
-        # Must start with an identifier
+        """Lee la parte mas pequena de una condicion.
+
+        Si encuentra ``id operador numero``, crea una comparacion. Si encuentra
+        solo ``id``, crea una condicion que pregunta si ese hecho esta activo.
+        """
+        # Todo atomo inicia con un identificador: variable para comparacion o
+        # nombre de hecho para condicion booleana.
         if not self.match(TokenType.ID):
             self.error("Expected identifier in condition")
 
         identifier_token = self.advance()
         identifier = identifier_token.lexeme
 
-        # Check if this is a comparison or a fact condition
+        # Si despues del identificador viene un operador relacional, el atomo
+        # es una comparacion numerica.
         if self.match(TokenType.GT, TokenType.LT, TokenType.EQ):
-            # It's a comparison
             operator_token = self.advance()
             operator = operator_token.lexeme
 
-            # Expect a value
+            # La comparacion siempre termina con un valor entero.
             value_token = self.expect(TokenType.VALUE)
             value = int(value_token.lexeme)
 
             return ComparisonCondition(
                 identifier=identifier, operator=operator, value=value
             )
-        else:
-            # It's a fact condition
-            return FactCondition(identifier=identifier)
+
+        # Si no hay operador, el identificador se interpreta como hecho
+        # activo/inactivo dentro del interprete.
+        return FactCondition(identifier=identifier)
 
     def parse_action(self) -> Action:
-        """Parse Action → id"""
+        """Lee la accion de una regla.
+
+        En este lenguaje, una accion solo significa activar un hecho con nombre.
+        """
+        # La accion solo puede activar un hecho identificado por un ID.
         identifier_token = self.expect(TokenType.ID)
         return Action(fact=identifier_token.lexeme)
 
 
 def parse_program(text: str) -> Program:
-    """Convenience function to parse a program from text.
+    """Convierte texto de reglas directamente en un ``Program``.
 
-    Args:
-        text: The source code of the program.
-
-    Returns:
-        The parsed Program AST.
-
-    Raises:
-        SyntaxError: If lexical analysis fails.
-        ParseError: If parsing fails.
+    Es el acceso principal del modulo: primero llama al lexer para crear tokens
+    y luego usa ``Parser`` para construir el AST.
     """
+    # Fase 1: convertir texto a tokens. Fase 2: consumir tokens y construir AST.
     tokens = tokenize(text)
     parser = Parser(tokens)
     return parser.parse()
 
 
 if __name__ == "__main__":
-    # Test parsing
+    # Prueba manual rapida: parsea dos reglas y muestra sus nombres.
     code = """rule r1:
 if temp > 30 then alert
 
@@ -201,4 +245,3 @@ if alert AND active then notify
     print(f"Parsed {len(program.rules)} rules")
     for rule in program.rules:
         print(f"  Rule: {rule.name}")
-

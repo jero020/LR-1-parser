@@ -9,7 +9,12 @@ from pathlib import Path
 
 # Ejecuta un caso de prueba completo y compara la salida real con expected.txt.
 def run_test(test_dir: Path, main_path: Path) -> bool:
-    """Run one test directory and compare stdout with expected output."""
+    """Ejecuta una carpeta de prueba y verifica si la salida coincide.
+
+    Cada caso tiene ``rules.txt``, ``state.txt`` y ``expected.txt``. La funcion
+    corre el programa real con esos archivos y compara lo que imprimio contra
+    la salida esperada.
+    """
 
     # Cada carpeta de prueba debe contener reglas, estado inicial y salida
     # esperada con nombres fijos.
@@ -44,7 +49,11 @@ def run_test(test_dir: Path, main_path: Path) -> bool:
 
 
 def main() -> int:
-    """Discover and run all complete test cases in the tests directory."""
+    """Busca todos los casos de prueba completos y los ejecuta.
+
+    Al final imprime cuantos pasaron y devuelve codigo 0 si todos fueron
+    correctos, o codigo 1 si alguno fallo.
+    """
 
     # Calcula rutas relativas al archivo actual para poder ejecutar las pruebas
     # desde cualquier directorio de trabajo.
