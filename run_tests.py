@@ -1,4 +1,4 @@
-"""Run integration tests for the PC monitoring rule language."""
+"""Run integration tests for the Lr-1-parser rule language."""
 
 from __future__ import annotations
 
